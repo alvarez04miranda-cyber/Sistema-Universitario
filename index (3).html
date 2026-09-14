@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campus Salesiano</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+:root{ --azul:#0b2559; --azul2:#0d1b3d; --amarillo:#ffc72c; --rojo:#d31111; }
+body{ background:#eef1f8; font-family:'Segoe UI',Arial,sans-serif; margin:0; }
+
+/* ---------- Pantalla de login/registro ---------- */
+.auth-wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,var(--azul),var(--azul2)); }
+.auth-card{ max-width:460px; width:92%; background:#fff; border-radius:16px; padding:2rem; box-shadow:0 20px 40px rgba(0,0,0,.25); }
+.auth-logo{ width:60px; height:60px; margin:0 auto 1rem; display:block; }
+
+/* ---------- Layout de la app ---------- */
+.app-shell{ display:none; min-height:100vh; }
+.sidebar{ width:230px; background:var(--azul); color:#fff; min-height:100vh; position:sticky; top:0; flex-shrink:0; }
+.sidebar .marca{ padding:1.2rem 1rem; text-align:center; border-bottom:1px solid rgba(255,255,255,.1); }
+.sidebar .marca img,.sidebar .marca svg{ width:44px; height:44px; }
+.sidebar .marca h6{ margin:.5rem 0 0; font-weight:700; letter-spacing:1px; }
+.sidebar .marca small{ opacity:.7; }
+.sidebar-link{ display:flex; align-items:center; gap:.6rem; padding:.75rem 1.2rem; color:rgba(255,255,255,.8); text-decoration:none; cursor:pointer; font-weight:500; }
+.sidebar-link i{ font-size:1.1rem; width:20px; text-align:center; }
+.sidebar-link:hover{ background:rgba(255,255,255,.07); color:#fff; }
+.sidebar-link.activo{ background:var(--amarillo); color:#1a1a1a; font-weight:700; }
+.sidebar-link.salir{ margin-top:1rem; color:#ffb3b3; }
+
+.topbar{ background:#fff; border-bottom:1px solid #e2e6ee; padding:.7rem 1.5rem; display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; }
+.chip{ background:#eef1f8; border-radius:999px; padding:.3rem .9rem; font-size:.8rem; color:#444; }
+.contenido{ flex:1; padding:1.5rem; max-width:900px; margin:0 auto; width:100%; }
+
+.seccion{ display:none; } .seccion.activa{ display:block; }
+
+/* ---------- Perfil ---------- */
+.avatar{ width:96px; height:96px; border-radius:50%; object-fit:cover; background:#dfe4ef; border:3px solid var(--amarillo); }
+.avatar-sm{ width:44px; height:44px; border-radius:50%; object-fit:cover; background:#dfe4ef; }
+.card-perfil{ background:#fff; border-radius:14px; padding:1.5rem; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+
+/* ---------- Muro ---------- */
+.post-card{ background:#fff; border-radius:14px; padding:1.1rem; margin-bottom:1rem; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+.post-header{ display:flex; align-items:center; gap:.7rem; margin-bottom:.6rem; }
+.post-img{ max-width:100%; border-radius:10px; margin-top:.6rem; }
+.badge-rol{ font-size:.7rem; }
+
+.placeholder-box{ text-align:center; padding:3rem 1rem; color:#8590a6; background:#fff; border-radius:14px; }
+
+.toast-usb{ position:fixed; bottom:1rem; left:50%; transform:translateX(-50%); background:#0d1b3d; color:#fff; padding:.6rem 1.2rem; border-radius:999px; font-size:.85rem; z-index:2000; opacity:0; pointer-events:none; transition:.3s; }
+
+@media (max-width: 768px){
+  .sidebar{ width:64px; }
+  .sidebar .marca h6, .sidebar .marca small, .sidebar-link span{ display:none; }
+  .sidebar-link{ justify-content:center; padding:.9rem 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     PANTALLA DE LOGIN / REGISTRO
+     ============================================================ -->
+<div id="vista-auth" class="auth-wrap">
+  <div class="auth-card">
+    <svg class="auth-logo" viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="#0b2559" stroke="#ffc72c" stroke-width="5"/><text x="50" y="66" font-size="52" font-weight="bold" text-anchor="middle" fill="#d31111">S</text></svg>
+    <h4 class="text-center fw-bold mb-1">Campus Salesiano</h4>
+    <p class="text-center text-muted small mb-4">Correo institucional @usalesiana.edu.bo</p>
+
+    <!-- ---- LOGIN ---- -->
+    <form id="form-login">
+      <div class="mb-3"><input type="email" class="form-control" id="login-correo" placeholder="tu.correo@usalesiana.edu.bo" required></div>
+      <div class="mb-3"><input type="password" class="form-control" id="login-clave" placeholder="Contraseña" required></div>
+      <button class="btn btn-primary w-100" style="background:var(--azul);border-color:var(--azul);">Ingresar</button>
+      <p class="text-center small mt-3 mb-0">¿No tienes cuenta? <a href="#" id="ir-registro">Regístrate</a></p>
+    </form>
+
+    <!-- ---- REGISTRO ---- -->
+    <form id="form-registro" style="display:none;">
+      <div class="mb-2">
+        <label class="form-label small fw-bold">Soy:</label>
+        <select id="reg-rol" class="form-select">
+          <option value="estudiante">Estudiante</option>
+          <option value="docente">Docente</option>
+        </select>
+      </div>
+      <div class="mb-2"><input type="text" class="form-control" id="reg-nombre" placeholder="Nombre completo *" required></div>
+      <div class="mb-2"><input type="text" class="form-control" id="reg-apodo" placeholder="Apodo (opcional)"></div>
+      <div class="mb-2"><input type="email" class="form-control" id="reg-correo" placeholder="tu.correo@usalesiana.edu.bo *" required></div>
+      <div class="mb-2"><input type="password" class="form-control" id="reg-clave" placeholder="Contraseña *" required minlength="6"></div>
+
+      <div id="campos-estudiante" class="row g-2">
+        <div class="col-6"><input type="text" class="form-control" id="reg-ci" placeholder="CI"></div>
+        <div class="col-6"><input type="text" class="form-control" id="reg-ru" placeholder="RU"></div>
+        <div class="col-6"><input type="date" class="form-control" id="reg-nacimiento" placeholder="Fecha de nacimiento"></div>
+        <div class="col-6"><input type="text" class="form-control" id="reg-carrera" placeholder="Carrera"></div>
+        <div class="col-6"><input type="number" min="1" max="12" class="form-control" id="reg-semestre" placeholder="Semestre"></div>
+        <div class="col-6"><input type="text" class="form-control" id="reg-paralelo" placeholder="Paralelo (ej. A)"></div>
+        <div class="col-12">
+          <select class="form-select" id="reg-turno">
+            <option value="">Turno...</option>
+            <option>Mañana</option><option>Tarde</option><option>Noche</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="campos-docente" class="row g-2" style="display:none;">
+        <div class="col-12"><input type="text" class="form-control" id="reg-carrera-doc" placeholder="Carrera(s) en la que imparte materias"></div>
+      </div>
+
+      <button class="btn btn-primary w-100 mt-3" style="background:var(--rojo);border-color:var(--rojo);">Crear cuenta</button>
+      <p class="text-center small mt-3 mb-0">¿Ya tienes cuenta? <a href="#" id="ir-login">Inicia sesión</a></p>
+    </form>
+
+    <div id="auth-mensaje" class="alert alert-danger mt-3 py-2 small" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     APP (después de iniciar sesión)
+     ============================================================ -->
+<div id="app-shell" class="app-shell">
+  <div class="sidebar d-flex flex-column">
+    <div class="marca">
+      <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="#0b2559" stroke="#ffc72c" stroke-width="5"/><text x="50" y="66" font-size="52" font-weight="bold" text-anchor="middle" fill="#d31111">S</text></svg>
+      <h6>SALESIANOS</h6><small>Campus</small>
+    </div>
+    <a class="sidebar-link activo" data-seccion="inicio"><i class="bi bi-house-door-fill"></i><span>Inicio</span></a>
+    <a class="sidebar-link" data-seccion="perfil"><i class="bi bi-person-fill"></i><span>Mi Perfil</span></a>
+    <a class="sidebar-link" data-seccion="notas"><i class="bi bi-journal-text"></i><span>Mis Notas</span></a>
+    <a class="sidebar-link" data-seccion="asistencia"><i class="bi bi-calendar-check"></i><span>Asistencia</span></a>
+    <a class="sidebar-link" data-seccion="avisos"><i class="bi bi-bell-fill"></i><span>Avisos</span></a>
+    <a class="sidebar-link" data-seccion="equipos"><i class="bi bi-people-fill"></i><span>Equipos</span></a>
+    <a class="sidebar-link salir mt-auto" id="btn-salir"><i class="bi bi-box-arrow-left"></i><span>Cerrar sesión</span></a>
+  </div>
+
+  <div class="flex-fill d-flex flex-column">
+    <div class="topbar" id="topbar-info"></div>
+
+    <div class="contenido">
+
+      <!-- ---------- INICIO / MURO ---------- -->
+      <section id="seccion-inicio" class="seccion activa">
+        <div class="post-card">
+          <textarea id="post-texto" class="form-control mb-2" rows="2" placeholder="¿Qué quieres compartir con el campus?"></textarea>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <input type="file" id="post-imagen" accept="image/*" class="form-control form-control-sm" style="max-width:220px;">
+            <button class="btn btn-sm text-white" style="background:var(--rojo);" id="btn-publicar"><i class="bi bi-send-fill"></i> Publicar</button>
+          </div>
+          <img id="post-preview" class="post-img mt-2" style="display:none; max-height:160px;">
+        </div>
+        <div id="muro"><p class="text-muted text-center py-4">Cargando publicaciones…</p></div>
+      </section>
+
+      <!-- ---------- PERFIL ---------- -->
+      <section id="seccion-perfil" class="seccion">
+        <div class="card-perfil">
+          <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+            <img id="perfil-foto" class="avatar" src="">
+            <div>
+              <input type="file" id="input-foto-perfil" accept="image/*" class="form-control form-control-sm">
+              <small class="text-muted">Puedes cambiar tu foto cuando quieras</small>
+            </div>
+          </div>
+          <form id="form-perfil" class="row g-3">
+            <div class="col-md-6"><label class="form-label fw-bold small">Nombre completo</label><input type="text" class="form-control" id="p-nombre"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">Apodo</label><input type="text" class="form-control" id="p-apodo"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">CI</label><input type="text" class="form-control" id="p-ci"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">RU</label><input type="text" class="form-control" id="p-ru"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">Fecha de nacimiento</label><input type="date" class="form-control" id="p-nacimiento"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">Carrera</label><input type="text" class="form-control" id="p-carrera"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">Semestre</label><input type="number" class="form-control" id="p-semestre"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">Paralelo</label><input type="text" class="form-control" id="p-paralelo"></div>
+            <div class="col-md-6"><label class="form-label fw-bold small">Turno</label>
+              <select class="form-select" id="p-turno"><option value="">--</option><option>Mañana</option><option>Tarde</option><option>Noche</option></select>
+            </div>
+            <div class="col-12 text-end"><button class="btn text-white" style="background:var(--azul);"><i class="bi bi-save"></i> Guardar cambios</button></div>
+          </form>
+        </div>
+      </section>
+
+      <!-- ---------- PLACEHOLDERS (próximas fases) ---------- -->
+      <section id="seccion-notas" class="seccion"><div class="placeholder-box"><i class="bi bi-journal-text fs-1"></i><p class="mt-2 mb-0">Notas y Asistencia unificadas — próxima fase.</p></div></section>
+      <section id="seccion-asistencia" class="seccion"><div class="placeholder-box"><i class="bi bi-calendar-check fs-1"></i><p class="mt-2 mb-0">Registro de asistencia por parcial — próxima fase.</p></div></section>
+      <section id="seccion-avisos" class="seccion"><div class="placeholder-box"><i class="bi bi-bell-fill fs-1"></i><p class="mt-2 mb-0">Avisos, tareas y notificaciones del docente — próxima fase.</p></div></section>
+      <section id="seccion-equipos" class="seccion"><div class="placeholder-box"><i class="bi bi-people-fill fs-1"></i><p class="mt-2 mb-0">Amigos, chats y grupos de trabajo — próxima fase.</p></div></section>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast-usb"></div>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN SUPABASE
+   ============================================================ */
+const SUPABASE_URL = 'https://jfzmbttshakjqgygrctk.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impmem1idHRzaGFranFneWdyY3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MDgxMzYsImV4cCI6MjEwNDI4NDEzNn0.L4AaYsCR77FHAb-_S84fnP0INgfl_RM3wO1sLe6ByAQ';
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const DOMINIO = '@usalesiana.edu.bo';
+let perfilActual = null;
+
+function escapeHtml(t){ const d=document.createElement('div'); d.textContent=t??''; return d.innerHTML; }
+function mostrarToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.style.opacity='1'; el.style.transform='translate(-50%,-8px)';
+  clearTimeout(mostrarToast._t);
+  mostrarToast._t=setTimeout(()=>{ el.style.opacity='0'; el.style.transform='translate(-50%,0)'; },1800);
+}
+function mostrarErrorAuth(msg){
+  const el=document.getElementById('auth-mensaje');
+  el.textContent=msg; el.style.display='block';
+}
+function ocultarErrorAuth(){ document.getElementById('auth-mensaje').style.display='none'; }
+
+/* ============================================================
+   TOGGLE LOGIN <-> REGISTRO
+   ============================================================ */
+document.getElementById('ir-registro').addEventListener('click', e=>{ e.preventDefault(); ocultarErrorAuth(); document.getElementById('form-login').style.display='none'; document.getElementById('form-registro').style.display='block'; });
+document.getElementById('ir-login').addEventListener('click', e=>{ e.preventDefault(); ocultarErrorAuth(); document.getElementById('form-registro').style.display='none'; document.getElementById('form-login').style.display='block'; });
+document.getElementById('reg-rol').addEventListener('change', e=>{
+  const esEstudiante = e.target.value === 'estudiante';
+  document.getElementById('campos-estudiante').style.display = esEstudiante ? 'flex' : 'none';
+  document.getElementById('campos-docente').style.display = esEstudiante ? 'none' : 'flex';
+});
+
+/* ============================================================
+   REGISTRO
+   ============================================================ */
+document.getElementById('form-registro').addEventListener('submit', async e=>{
+  e.preventDefault();
+  ocultarErrorAuth();
+
+  const correo = document.getElementById('reg-correo').value.trim().toLowerCase();
+  const clave = document.getElementById('reg-clave').value;
+  const rol = document.getElementById('reg-rol').value;
+  const nombre = document.getElementById('reg-nombre').value.trim();
+
+  if(!correo.endsWith(DOMINIO)){
+    mostrarErrorAuth(`Debes usar tu correo institucional (${DOMINIO})`);
+    return;
+  }
+  if(!nombre){ mostrarErrorAuth('El nombre completo es obligatorio.'); return; }
+
+  const { data, error } = await db.auth.signUp({ email: correo, password: clave });
+  if(error){ mostrarErrorAuth('Error al crear la cuenta: ' + error.message); return; }
+
+  const nuevoUsuario = data.user;
+  if(!nuevoUsuario){
+    mostrarErrorAuth('Revisa tu correo para confirmar la cuenta antes de continuar.');
+    return;
+  }
+
+  const perfil = {
+    id: nuevoUsuario.id,
+    correo,
+    rol,
+    nombre_completo: nombre,
+    apodo: document.getElementById('reg-apodo').value.trim() || null,
+    ci: rol==='estudiante' ? document.getElementById('reg-ci').value.trim() || null : null,
+    ru: rol==='estudiante' ? document.getElementById('reg-ru').value.trim() || null : null,
+    fecha_nacimiento: rol==='estudiante' ? (document.getElementById('reg-nacimiento').value || null) : null,
+    carrera: rol==='estudiante' ? document.getElementById('reg-carrera').value.trim() || null : document.getElementById('reg-carrera-doc').value.trim() || null,
+    semestre: rol==='estudiante' ? (Number(document.getElementById('reg-semestre').value) || null) : null,
+    paralelo: rol==='estudiante' ? document.getElementById('reg-paralelo').value.trim() || null : null,
+    turno: rol==='estudiante' ? document.getElementById('reg-turno').value || null : null
+  };
+
+  const { error: errorPerfil } = await db.from('perfiles').insert([perfil]);
+  if(errorPerfil){
+    mostrarErrorAuth('Cuenta creada, pero hubo un error guardando tu perfil: ' + errorPerfil.message);
+    return;
+  }
+
+  mostrarToast('Cuenta creada ✔');
+  await iniciarSesionApp();
+});
+
+/* ============================================================
+   LOGIN
+   ============================================================ */
+document.getElementById('form-login').addEventListener('submit', async e=>{
+  e.preventDefault();
+  ocultarErrorAuth();
+  const correo = document.getElementById('login-correo').value.trim().toLowerCase();
+  const clave = document.getElementById('login-clave').value;
+
+  const { error } = await db.auth.signInWithPassword({ email: correo, password: clave });
+  if(error){ mostrarErrorAuth('Correo o contraseña incorrectos.'); return; }
+  await iniciarSesionApp();
+});
+
+document.getElementById('btn-salir').addEventListener('click', async ()=>{
+  await db.auth.signOut();
+  location.reload();
+});
+
+/* ============================================================
+   CARGA DE SESIÓN / PERFIL Y ARRANQUE DE LA APP
+   ============================================================ */
+async function iniciarSesionApp(){
+  const { data: { session } } = await db.auth.getSession();
+  if(!session) return;
+
+  const { data: perfil, error } = await db.from('perfiles').select('*').eq('id', session.user.id).single();
+  if(error || !perfil){ mostrarErrorAuth('No se encontró tu perfil. Contacta al administrador.'); return; }
+
+  perfilActual = perfil;
+  document.getElementById('vista-auth').style.display = 'none';
+  document.getElementById('app-shell').style.display = 'flex';
+
+  pintarTopbar();
+  cargarFormularioPerfil();
+  cargarMuro();
+}
+
+function pintarTopbar(){
+  const top = document.getElementById('topbar-info');
+  if(perfilActual.rol === 'estudiante'){
+    top.innerHTML = `
+      <span class="chip"><i class="bi bi-mortarboard"></i> ${escapeHtml(perfilActual.carrera||'—')}</span>
+      <span class="chip">RU ${escapeHtml(perfilActual.ru||'—')}</span>
+      <span class="chip">Semestre ${escapeHtml(String(perfilActual.semestre||'—'))}</span>
+      <span class="chip">Paralelo ${escapeHtml(perfilActual.paralelo||'—')}</span>`;
+  } else {
+    top.innerHTML = `<span class="chip"><i class="bi bi-person-workspace"></i> Docente</span><span class="chip">${escapeHtml(perfilActual.carrera||'—')}</span>`;
+  }
+}
+
+/* ============================================================
+   NAVEGACIÓN LATERAL
+   ============================================================ */
+document.querySelectorAll('.sidebar-link[data-seccion]').forEach(link=>{
+  link.addEventListener('click', ()=>{
+    document.querySelectorAll('.sidebar-link').forEach(l=>l.classList.remove('activo'));
+    link.classList.add('activo');
+    document.querySelectorAll('.seccion').forEach(s=>s.classList.remove('activa'));
+    document.getElementById('seccion-'+link.dataset.seccion).classList.add('activa');
+  });
+});
+
+/* ============================================================
+   PERFIL: cargar formulario + guardar cambios + subir foto
+   ============================================================ */
+function cargarFormularioPerfil(){
+  document.getElementById('perfil-foto').src = perfilActual.foto_url || iniciales(perfilActual.nombre_completo);
+  document.getElementById('p-nombre').value = perfilActual.nombre_completo || '';
+  document.getElementById('p-apodo').value = perfilActual.apodo || '';
+  document.getElementById('p-ci').value = perfilActual.ci || '';
+  document.getElementById('p-ru').value = perfilActual.ru || '';
+  document.getElementById('p-nacimiento').value = perfilActual.fecha_nacimiento || '';
+  document.getElementById('p-carrera').value = perfilActual.carrera || '';
+  document.getElementById('p-semestre').value = perfilActual.semestre || '';
+  document.getElementById('p-paralelo').value = perfilActual.paralelo || '';
+  document.getElementById('p-turno').value = perfilActual.turno || '';
+}
+
+function iniciales(nombre){
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100%" height="100%" fill="#0b2559"/><text x="50%" y="55%" font-size="36" fill="#ffc72c" text-anchor="middle" font-family="Arial" dy=".1em">${(nombre||'?').charAt(0).toUpperCase()}</text></svg>`;
+  return 'data:image/svg+xml;base64,' + btoa(svg);
+}
+
+document.getElementById('form-perfil').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const cambios = {
+    nombre_completo: document.getElementById('p-nombre').value.trim(),
+    apodo: document.getElementById('p-apodo').value.trim() || null,
+    ci: document.getElementById('p-ci').value.trim() || null,
+    ru: document.getElementById('p-ru').value.trim() || null,
+    fecha_nacimiento: document.getElementById('p-nacimiento').value || null,
+    carrera: document.getElementById('p-carrera').value.trim() || null,
+    semestre: Number(document.getElementById('p-semestre').value) || null,
+    paralelo: document.getElementById('p-paralelo').value.trim() || null,
+    turno: document.getElementById('p-turno').value || null
+  };
+  const { error } = await db.from('perfiles').update(cambios).eq('id', perfilActual.id);
+  if(error){ mostrarToast('Error al guardar'); return; }
+  perfilActual = { ...perfilActual, ...cambios };
+  pintarTopbar();
+  mostrarToast('Perfil actualizado ✔');
+});
+
+document.getElementById('input-foto-perfil').addEventListener('change', async e=>{
+  const archivo = e.target.files[0];
+  if(!archivo) return;
+  const ruta = `avatares/${perfilActual.id}-${Date.now()}.${archivo.name.split('.').pop()}`;
+  const { error: errorSubida } = await db.storage.from('medios').upload(ruta, archivo, { upsert:true });
+  if(errorSubida){ mostrarToast('Error al subir la foto'); return; }
+  const { data } = db.storage.from('medios').getPublicUrl(ruta);
+  const { error: errorUpdate } = await db.from('perfiles').update({ foto_url: data.publicUrl }).eq('id', perfilActual.id);
+  if(errorUpdate){ mostrarToast('Error al guardar la foto'); return; }
+  perfilActual.foto_url = data.publicUrl;
+  document.getElementById('perfil-foto').src = data.publicUrl;
+  mostrarToast('Foto actualizada ✔');
+});
+
+/* ============================================================
+   MURO DE PUBLICACIONES (tipo Facebook)
+   ============================================================ */
+let imagenPostTemporal = null;
+
+document.getElementById('post-imagen').addEventListener('change', e=>{
+  const archivo = e.target.files[0];
+  imagenPostTemporal = archivo || null;
+  const preview = document.getElementById('post-preview');
+  if(!archivo){ preview.style.display='none'; return; }
+  const lector = new FileReader();
+  lector.onload = ev=>{ preview.src = ev.target.result; preview.style.display='block'; };
+  lector.readAsDataURL(archivo);
+});
+
+document.getElementById('btn-publicar').addEventListener('click', async ()=>{
+  const contenido = document.getElementById('post-texto').value.trim();
+  if(!contenido && !imagenPostTemporal){ mostrarToast('Escribe algo o adjunta una imagen'); return; }
+
+  let imagen_url = null;
+  if(imagenPostTemporal){
+    const ruta = `publicaciones/${perfilActual.id}-${Date.now()}.${imagenPostTemporal.name.split('.').pop()}`;
+    const { error: errorSubida } = await db.storage.from('medios').upload(ruta, imagenPostTemporal);
+    if(errorSubida){ mostrarToast('Error al subir la imagen'); return; }
+    imagen_url = db.storage.from('medios').getPublicUrl(ruta).data.publicUrl;
+  }
+
+  const { error } = await db.from('publicaciones').insert([{ autor_id: perfilActual.id, contenido, imagen_url }]);
+  if(error){ mostrarToast('Error al publicar'); return; }
+
+  document.getElementById('post-texto').value = '';
+  document.getElementById('post-imagen').value = '';
+  document.getElementById('post-preview').style.display='none';
+  imagenPostTemporal = null;
+  mostrarToast('Publicado ✔');
+});
+
+async function cargarMuro(){
+  const { data, error } = await db
+    .from('publicaciones')
+    .select('*, autor:perfiles(nombre_completo, apodo, foto_url, rol)')
+    .order('created_at', { ascending:false })
+    .limit(50);
+
+  const muro = document.getElementById('muro');
+  if(error){ muro.innerHTML = '<p class="text-danger text-center py-4">Error al cargar el muro.</p>'; return; }
+  muro.innerHTML = data.length ? data.map(tarjetaPost).join('') : '<p class="text-muted text-center py-4">Aún no hay publicaciones. ¡Sé el primero!</p>';
+}
+
+function tarjetaPost(p){
+  const autor = p.autor || {};
+  const nombreMostrado = autor.apodo || autor.nombre_completo || 'Usuario';
+  const foto = autor.foto_url || iniciales(autor.nombre_completo);
+  return `
+    <div class="post-card">
+      <div class="post-header">
+        <img src="${foto}" class="avatar-sm">
+        <div>
+          <div class="fw-bold">${escapeHtml(nombreMostrado)} ${autor.rol==='docente' ? '<span class="badge bg-primary badge-rol">Docente</span>' : ''}</div>
+          <div class="text-muted small">${new Date(p.created_at).toLocaleString()}</div>
+        </div>
+      </div>
+      ${p.contenido ? `<p class="mb-0">${escapeHtml(p.contenido)}</p>` : ''}
+      ${p.imagen_url ? `<img src="${p.imagen_url}" class="post-img">` : ''}
+    </div>`;
+}
+
+db.channel('public:publicaciones')
+  .on('postgres_changes', { event:'*', schema:'public', table:'publicaciones' }, cargarMuro)
+  .subscribe();
+
+/* ============================================================
+   ARRANQUE: si ya hay sesión guardada, entra directo
+   ============================================================ */
+(async ()=>{
+  const { data: { session } } = await db.auth.getSession();
+  if(session) await iniciarSesionApp();
+})();
+</script>
+</body>
+</html>
